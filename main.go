@@ -46,7 +46,7 @@ func main() {
 	chatClient := client.New(cfg.APIEndpoint, cfg.APIKey, cfg.APITimeout)
 	elysiaClient := client.New(cfg.ElysiaAPIEndpoint, cfg.ElysiaAPIKey, cfg.APITimeout)
 
-	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, chatClient, elysiaClient)
+	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, chatClient, elysiaClient, cfg.UnregisterCommandsOnShutdown)
 	if err != nil {
 		slog.Error("failed to create bot", "error", err)
 		os.Exit(1)

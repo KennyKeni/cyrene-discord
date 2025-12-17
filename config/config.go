@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	DiscordToken       string
-	GuildID            string
-	APIEndpoint        string
-	APIKey             string
-	APITimeout         time.Duration
-	ElysiaAPIEndpoint  string
-	ElysiaAPIKey       string
+	DiscordToken                 string
+	GuildID                      string
+	APIEndpoint                  string
+	APIKey                       string
+	APITimeout                   time.Duration
+	ElysiaAPIEndpoint            string
+	ElysiaAPIKey                 string
+	UnregisterCommandsOnShutdown bool
 }
 
 func Load() (*Config, error) {
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("API_TIMEOUT", 60)
+	viper.SetDefault("UNREGISTER_COMMANDS_ON_SHUTDOWN", true)
 
 	viper.BindEnv("DISCORD_TOKEN")
 	viper.BindEnv("DISCORD_GUILD_ID")
@@ -31,14 +33,16 @@ func Load() (*Config, error) {
 	viper.BindEnv("API_TIMEOUT")
 	viper.BindEnv("ELYSIA_API_ENDPOINT")
 	viper.BindEnv("ELYSIA_API_KEY")
+	viper.BindEnv("UNREGISTER_COMMANDS_ON_SHUTDOWN")
 
 	return &Config{
-		DiscordToken:      viper.GetString("DISCORD_TOKEN"),
-		GuildID:           viper.GetString("DISCORD_GUILD_ID"),
-		APIEndpoint:       viper.GetString("API_ENDPOINT"),
-		APIKey:            viper.GetString("API_KEY"),
-		APITimeout:        time.Duration(viper.GetInt("API_TIMEOUT")) * time.Second,
-		ElysiaAPIEndpoint: viper.GetString("ELYSIA_API_ENDPOINT"),
-		ElysiaAPIKey:      viper.GetString("ELYSIA_API_KEY"),
+		DiscordToken:                 viper.GetString("DISCORD_TOKEN"),
+		GuildID:                      viper.GetString("DISCORD_GUILD_ID"),
+		APIEndpoint:                  viper.GetString("API_ENDPOINT"),
+		APIKey:                       viper.GetString("API_KEY"),
+		APITimeout:                   time.Duration(viper.GetInt("API_TIMEOUT")) * time.Second,
+		ElysiaAPIEndpoint:            viper.GetString("ELYSIA_API_ENDPOINT"),
+		ElysiaAPIKey:                 viper.GetString("ELYSIA_API_KEY"),
+		UnregisterCommandsOnShutdown: viper.GetBool("UNREGISTER_COMMANDS_ON_SHUTDOWN"),
 	}, nil
 }

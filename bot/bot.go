@@ -9,11 +9,12 @@ import (
 )
 
 type Bot struct {
-	session       *discordgo.Session
-	guildID       string
-	chatHandler   *handler.ChatHandler
-	elysiaHandler *handler.ChatHandler
-	commandIDs    []string
+	session                      *discordgo.Session
+	guildID                      string
+	chatHandler                  *handler.ChatHandler
+	elysiaHandler                *handler.ChatHandler
+	commandIDs                   []string
+	unregisterCommandsOnShutdown bool
 }
 
 var chatCommand = &discordgo.ApplicationCommand{
@@ -42,17 +43,18 @@ var elysiaCommand = &discordgo.ApplicationCommand{
 	},
 }
 
-func New(token, guildID string, chatClient, elysiaClient *client.Client) (*Bot, error) {
+func New(token, guildID string, chatClient, elysiaClient *client.Client, unregisterCommandsOnShutdown bool) (*Bot, error) {
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Bot{
-		session:       session,
-		guildID:       guildID,
-		chatHandler:   handler.NewChatHandler(chatClient, "chat"),
-		elysiaHandler: handler.NewChatHandler(elysiaClient, "elysia"),
+		session:                      session,
+		guildID:                      guildID,
+		chatHandler:                  handler.NewChatHandler(chatClient, "chat"),
+		elysiaHandler:                handler.NewChatHandler(elysiaClient, "elysia"),
+		unregisterCommandsOnShutdown: unregisterCommandsOnShutdown,
 	}, nil
 }
 
@@ -91,14 +93,18 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) Stop() error {
-	for _, cmdID := range b.commandIDs {
-		if err := b.session.ApplicationCommandDelete(b.session.State.User.ID, b.guildID, cmdID); err != nil {
-			slog.Error("failed to delete command", "command_id", cmdID, "error", err)
-		} else {
-			slog.Debug("command deleted", "command_id", cmdID)
+	if b.unregisterCommandsOnShutdown {
+		for _, cmdID := range b.commandIDs {
+			if err := b.session.ApplicationCommandDelete(b.session.State.User.ID, b.guildID, cmdID); err != nil {
+				slog.Error("failed to delete command", "command_id", cmdID, "error", err)
+			} else {
+				slog.Debug("command deleted", "command_id", cmdID)
+			}
 		}
+		slog.Info("commands cleaned up", "count", len(b.commandIDs))
+	} else {
+		slog.Info("skipping command cleanup")
 	}
-	slog.Info("commands cleaned up", "count", len(b.commandIDs))
 
 	return b.session.Close()
 }
