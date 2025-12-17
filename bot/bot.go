@@ -1,7 +1,7 @@
 package bot
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/KennyKeni/cyrene-discord.git/client"
 	"github.com/KennyKeni/cyrene-discord.git/handler"
@@ -47,7 +47,11 @@ func (b *Bot) Start() error {
 	})
 
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Printf("Bot is ready as %s#%s", r.User.Username, r.User.Discriminator)
+		slog.Info("bot ready",
+			"username", r.User.Username,
+			"discriminator", r.User.Discriminator,
+			"bot_id", r.User.ID,
+		)
 	})
 
 	if err := b.session.Open(); err != nil {
@@ -60,17 +64,23 @@ func (b *Bot) Start() error {
 	}
 	b.commandIDs = append(b.commandIDs, cmd.ID)
 
-	log.Println("Registered /chat command")
+	slog.Info("command registered",
+		"command", chatCommand.Name,
+		"command_id", cmd.ID,
+		"guild_id", b.guildID,
+	)
 	return nil
 }
 
 func (b *Bot) Stop() error {
 	for _, cmdID := range b.commandIDs {
 		if err := b.session.ApplicationCommandDelete(b.session.State.User.ID, b.guildID, cmdID); err != nil {
-			log.Printf("failed to delete command %s: %v", cmdID, err)
+			slog.Error("failed to delete command", "command_id", cmdID, "error", err)
+		} else {
+			slog.Debug("command deleted", "command_id", cmdID)
 		}
 	}
-	log.Println("Cleaned up commands")
+	slog.Info("commands cleaned up", "count", len(b.commandIDs))
 
 	return b.session.Close()
 }

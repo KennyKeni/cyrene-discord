@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,35 +12,52 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	if cfg.DiscordToken == "" {
-		log.Fatal("DISCORD_TOKEN is required")
+		slog.Error("missing required config", "field", "DISCORD_TOKEN")
+		os.Exit(1)
 	}
 	if cfg.APIEndpoint == "" {
-		log.Fatal("API_ENDPOINT is required")
+		slog.Error("missing required config", "field", "API_ENDPOINT")
+		os.Exit(1)
 	}
+
+	slog.Info("config loaded",
+		"api_endpoint", cfg.APIEndpoint,
+		"api_timeout", cfg.APITimeout,
+		"guild_id", cfg.GuildID,
+	)
 
 	apiClient := client.New(cfg.APIEndpoint, cfg.APIKey, cfg.APITimeout)
 
 	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, apiClient)
 	if err != nil {
-		log.Fatalf("failed to create bot: %v", err)
+		slog.Error("failed to create bot", "error", err)
+		os.Exit(1)
 	}
 
 	if err := b.Start(); err != nil {
-		log.Fatalf("failed to start bot: %v", err)
+		slog.Error("failed to start bot", "error", err)
+		os.Exit(1)
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
+	sig := <-stop
 
-	log.Println("Shutting down...")
+	slog.Info("shutdown signal received", "signal", sig.String())
 	if err := b.Stop(); err != nil {
-		log.Printf("error during shutdown: %v", err)
+		slog.Error("error during shutdown", "error", err)
 	}
+	slog.Info("shutdown complete")
 }

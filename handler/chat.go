@@ -2,7 +2,8 @@ package handler
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"time"
 
 	"github.com/KennyKeni/cyrene-discord.git/client"
 	"github.com/bwmarrin/discordgo"
@@ -25,12 +26,11 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-	})
-	if err != nil {
-		log.Printf("failed to send deferred response: %v", err)
-		return
+	var userID string
+	if i.Member != nil && i.Member.User != nil {
+		userID = i.Member.User.ID
+	} else if i.User != nil {
+		userID = i.User.ID
 	}
 
 	options := i.ApplicationCommandData().Options
@@ -42,33 +42,69 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 		}
 	}
 
-	var userID string
-	if i.Member != nil && i.Member.User != nil {
-		userID = i.Member.User.ID
-	} else if i.User != nil {
-		userID = i.User.ID
-	}
+	slog.Info("chat command received",
+		"user_id", userID,
+		"channel_id", i.ChannelID,
+		"guild_id", i.GuildID,
+		"message_length", len(message),
+	)
 
-	response, err := h.client.Send(context.Background(), message, userID)
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
 	if err != nil {
-		log.Printf("failed to get response from API: %v", err)
-		h.editResponse(s, i, "Failed to get response. Please try again later.")
+		slog.Error("failed to send deferred response",
+			"user_id", userID,
+			"error", err,
+		)
 		return
 	}
 
-	h.editResponse(s, i, response)
+	start := time.Now()
+	response, err := h.client.Send(context.Background(), message, userID)
+	duration := time.Since(start)
+
+	if err != nil {
+		slog.Error("failed to get response from API",
+			"user_id", userID,
+			"duration_ms", duration.Milliseconds(),
+			"error", err,
+		)
+		h.editResponse(s, i, userID, "Failed to get response. Please try again later.")
+		return
+	}
+
+	slog.Info("api response received",
+		"user_id", userID,
+		"duration_ms", duration.Milliseconds(),
+		"response_length", len(response),
+	)
+
+	h.editResponse(s, i, userID, response)
 }
 
 const maxMessageLength = 2000
 
-func (h *ChatHandler) editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+func (h *ChatHandler) editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
+	truncated := false
 	if len(content) > maxMessageLength {
 		content = content[:maxMessageLength-3] + "..."
+		truncated = true
+	}
+	if truncated {
+		slog.Debug("response truncated",
+			"user_id", userID,
+			"original_length", len(content)+3,
+			"max_length", maxMessageLength,
+		)
 	}
 	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Content: &content,
 	})
 	if err != nil {
-		log.Printf("failed to edit interaction response: %v", err)
+		slog.Error("failed to edit interaction response",
+			"user_id", userID,
+			"error", err,
+		)
 	}
 }

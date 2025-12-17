@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -53,13 +54,38 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", c.apiKey)
 
+	slog.Debug("sending api request",
+		"endpoint", c.endpoint,
+		"user_id", userID,
+		"body_size", len(body),
+	)
+
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		slog.Error("api request failed",
+			"endpoint", c.endpoint,
+			"user_id", userID,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"error", err,
+		)
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	slog.Debug("api response received",
+		"endpoint", c.endpoint,
+		"user_id", userID,
+		"status_code", resp.StatusCode,
+		"duration_ms", time.Since(start).Milliseconds(),
+	)
+
 	if resp.StatusCode != http.StatusOK {
+		slog.Error("api returned non-ok status",
+			"endpoint", c.endpoint,
+			"user_id", userID,
+			"status_code", resp.StatusCode,
+		)
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
