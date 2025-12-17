@@ -9,10 +9,11 @@ import (
 )
 
 type Bot struct {
-	session     *discordgo.Session
-	guildID     string
-	chatHandler *handler.ChatHandler
-	commandIDs  []string
+	session       *discordgo.Session
+	guildID       string
+	chatHandler   *handler.ChatHandler
+	elysiaHandler *handler.ChatHandler
+	commandIDs    []string
 }
 
 var chatCommand = &discordgo.ApplicationCommand{
@@ -28,22 +29,37 @@ var chatCommand = &discordgo.ApplicationCommand{
 	},
 }
 
-func New(token, guildID string, apiClient *client.Client) (*Bot, error) {
+var elysiaCommand = &discordgo.ApplicationCommand{
+	Name:        "elysia",
+	Description: "Send a message to Elysia",
+	Options: []*discordgo.ApplicationCommandOption{
+		{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "message",
+			Description: "Your message to send",
+			Required:    true,
+		},
+	},
+}
+
+func New(token, guildID string, chatClient, elysiaClient *client.Client) (*Bot, error) {
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Bot{
-		session:     session,
-		guildID:     guildID,
-		chatHandler: handler.NewChatHandler(apiClient),
+		session:       session,
+		guildID:       guildID,
+		chatHandler:   handler.NewChatHandler(chatClient, "chat"),
+		elysiaHandler: handler.NewChatHandler(elysiaClient, "elysia"),
 	}, nil
 }
 
 func (b *Bot) Start() error {
 	b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		go b.chatHandler.Handle(s, i)
+		go b.elysiaHandler.Handle(s, i)
 	})
 
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
@@ -58,17 +74,19 @@ func (b *Bot) Start() error {
 		return err
 	}
 
-	cmd, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, b.guildID, chatCommand)
-	if err != nil {
-		return err
+	for _, command := range []*discordgo.ApplicationCommand{chatCommand, elysiaCommand} {
+		cmd, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, b.guildID, command)
+		if err != nil {
+			return err
+		}
+		b.commandIDs = append(b.commandIDs, cmd.ID)
+		slog.Info("command registered",
+			"command", command.Name,
+			"command_id", cmd.ID,
+			"guild_id", b.guildID,
+		)
 	}
-	b.commandIDs = append(b.commandIDs, cmd.ID)
 
-	slog.Info("command registered",
-		"command", chatCommand.Name,
-		"command_id", cmd.ID,
-		"guild_id", b.guildID,
-	)
 	return nil
 }
 

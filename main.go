@@ -31,16 +31,22 @@ func main() {
 		slog.Error("missing required config", "field", "API_ENDPOINT")
 		os.Exit(1)
 	}
+	if cfg.ElysiaAPIEndpoint == "" {
+		slog.Error("missing required config", "field", "ELYSIA_API_ENDPOINT")
+		os.Exit(1)
+	}
 
 	slog.Info("config loaded",
 		"api_endpoint", cfg.APIEndpoint,
+		"elysia_api_endpoint", cfg.ElysiaAPIEndpoint,
 		"api_timeout", cfg.APITimeout,
 		"guild_id", cfg.GuildID,
 	)
 
-	apiClient := client.New(cfg.APIEndpoint, cfg.APIKey, cfg.APITimeout)
+	chatClient := client.New(cfg.APIEndpoint, cfg.APIKey, cfg.APITimeout)
+	elysiaClient := client.New(cfg.ElysiaAPIEndpoint, cfg.ElysiaAPIKey, cfg.APITimeout)
 
-	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, apiClient)
+	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, chatClient, elysiaClient)
 	if err != nil {
 		slog.Error("failed to create bot", "error", err)
 		os.Exit(1)

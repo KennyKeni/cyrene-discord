@@ -10,11 +10,12 @@ import (
 )
 
 type ChatHandler struct {
-	client *client.Client
+	client      *client.Client
+	commandName string
 }
 
-func NewChatHandler(c *client.Client) *ChatHandler {
-	return &ChatHandler{client: c}
+func NewChatHandler(c *client.Client, commandName string) *ChatHandler {
+	return &ChatHandler{client: c, commandName: commandName}
 }
 
 func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -22,7 +23,7 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	if i.ApplicationCommandData().Name != "chat" {
+	if i.ApplicationCommandData().Name != h.commandName {
 		return
 	}
 
@@ -42,7 +43,8 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 		}
 	}
 
-	slog.Info("chat command received",
+	slog.Info("command received",
+		"command", h.commandName,
 		"user_id", userID,
 		"channel_id", i.ChannelID,
 		"guild_id", i.GuildID,

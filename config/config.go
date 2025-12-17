@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
-	DiscordToken string
-	GuildID      string
-	APIEndpoint  string
-	APIKey       string
-	APITimeout   time.Duration
+	DiscordToken       string
+	GuildID            string
+	APIEndpoint        string
+	APIKey             string
+	APITimeout         time.Duration
+	ElysiaAPIEndpoint  string
+	ElysiaAPIKey       string
 }
 
 func Load() (*Config, error) {
@@ -27,12 +29,16 @@ func Load() (*Config, error) {
 	viper.BindEnv("API_ENDPOINT")
 	viper.BindEnv("API_KEY")
 	viper.BindEnv("API_TIMEOUT")
+	viper.BindEnv("ELYSIA_API_ENDPOINT")
+	viper.BindEnv("ELYSIA_API_KEY")
 
 	return &Config{
-		DiscordToken: viper.GetString("DISCORD_TOKEN"),
-		GuildID:      viper.GetString("DISCORD_GUILD_ID"),
-		APIEndpoint:  viper.GetString("API_ENDPOINT"),
-		APIKey:       viper.GetString("API_KEY"),
-		APITimeout:   time.Duration(viper.GetInt("API_TIMEOUT")) * time.Second,
+		DiscordToken:      viper.GetString("DISCORD_TOKEN"),
+		GuildID:           viper.GetString("DISCORD_GUILD_ID"),
+		APIEndpoint:       viper.GetString("API_ENDPOINT"),
+		APIKey:            viper.GetString("API_KEY"),
+		APITimeout:        time.Duration(viper.GetInt("API_TIMEOUT")) * time.Second,
+		ElysiaAPIEndpoint: viper.GetString("ELYSIA_API_ENDPOINT"),
+		ElysiaAPIKey:      viper.GetString("ELYSIA_API_KEY"),
 	}, nil
 }
