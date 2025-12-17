@@ -9,7 +9,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /cyrene-discord .
 
-FROM alpine:latest
+FROM alpine:latest AS production
 
 RUN apk --no-cache add ca-certificates
 
