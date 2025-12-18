@@ -19,6 +19,56 @@ func NewChatHandler(c *client.Client, commandName string) *ChatHandler {
 	return &ChatHandler{client: c, commandName: commandName}
 }
 
+func (h *ChatHandler) HandleMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Author.Bot {
+		return
+	}
+
+	channel, err := s.Channel(m.ChannelID)
+	if err != nil {
+		return
+	}
+
+	if !channel.IsThread() {
+		return
+	}
+
+	if channel.Name != h.commandName {
+		return
+	}
+
+	slog.Info("thread message received",
+		"command", h.commandName,
+		"user_id", m.Author.ID,
+		"thread_id", m.ChannelID,
+		"message_length", len(m.Content),
+	)
+
+	start := time.Now()
+	response, err := h.client.Send(context.Background(), m.Content, m.ChannelID)
+	duration := time.Since(start)
+
+	if err != nil {
+		slog.Error("failed to get response from API",
+			"user_id", m.Author.ID,
+			"thread_id", m.ChannelID,
+			"duration_ms", duration.Milliseconds(),
+			"error", err,
+		)
+		h.sendToThread(s, m.ChannelID, "Failed to get response. Please try again later.")
+		return
+	}
+
+	slog.Info("api response received",
+		"user_id", m.Author.ID,
+		"thread_id", m.ChannelID,
+		"duration_ms", duration.Milliseconds(),
+		"response_length", len(response),
+	)
+
+	h.sendToThread(s, m.ChannelID, response)
+}
+
 func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type != discordgo.InteractionApplicationCommand {
 		return
@@ -63,27 +113,71 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
+	threadID := i.ChannelID
+	channel, err := s.Channel(i.ChannelID)
+	if err != nil {
+		slog.Error("failed to get channel info",
+			"channel_id", i.ChannelID,
+			"error", err,
+		)
+	}
+
+	isThread := channel != nil && channel.IsThread()
+
+	if !isThread {
+		questionContent := message
+		msg, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: &questionContent,
+		})
+		if err != nil {
+			slog.Error("failed to edit interaction response",
+				"user_id", userID,
+				"error", err,
+			)
+			return
+		}
+
+		threadName := h.commandName
+		thread, err := s.MessageThreadStart(i.ChannelID, msg.ID, threadName, 60)
+		if err != nil {
+			slog.Error("failed to create thread",
+				"user_id", userID,
+				"message_id", msg.ID,
+				"error", err,
+			)
+			return
+		}
+		threadID = thread.ID
+
+		slog.Info("thread created",
+			"user_id", userID,
+			"thread_id", threadID,
+		)
+	}
+
 	start := time.Now()
-	response, err := h.client.Send(context.Background(), message, userID)
+	response, err := h.client.Send(context.Background(), message, threadID)
 	duration := time.Since(start)
 
 	if err != nil {
 		slog.Error("failed to get response from API",
 			"user_id", userID,
+			"thread_id", threadID,
 			"duration_ms", duration.Milliseconds(),
 			"error", err,
 		)
-		h.editResponse(s, i, userID, "Failed to get response. Please try again later.")
+		h.sendToThread(s, threadID, "Failed to get response. Please try again later.")
 		return
 	}
 
 	slog.Info("api response received",
 		"user_id", userID,
+		"thread_id", threadID,
 		"duration_ms", duration.Milliseconds(),
 		"response_length", len(response),
 	)
 
-	h.editResponse(s, i, userID, response)
+	h.sendToThread(s, threadID, response)
 }
 
 const (
@@ -91,96 +185,26 @@ const (
 	maxEmbedLength   = 4096
 )
 
-func (h *ChatHandler) editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
-	if len(content) <= maxMessageLength-10 {
-		h.sendSimpleResponse(s, i, userID, content)
-		return
-	}
-
-	if len(content) <= maxEmbedLength-10 {
-		h.sendEmbedResponse(s, i, userID, content)
-		return
-	}
-
-	h.sendThreadResponse(s, i, userID, content)
-}
-
-func (h *ChatHandler) sendSimpleResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
-	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &content})
-	if err != nil {
-		slog.Error("failed to edit interaction response",
-			"user_id", userID,
-			"error", err,
-		)
-	}
-}
-
-func (h *ChatHandler) sendEmbedResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
-	edit := &discordgo.WebhookEdit{
-		Embeds: &[]*discordgo.MessageEmbed{
-			{Description: content},
-		},
-	}
-	_, err := s.InteractionResponseEdit(i.Interaction, edit)
-	if err != nil {
-		slog.Error("failed to edit interaction response",
-			"user_id", userID,
-			"error", err,
-		)
-	}
-}
-
-func (h *ChatHandler) sendThreadResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
+func (h *ChatHandler) sendToThread(s *discordgo.Session, threadID, content string) {
 	chunks := chunkContent(content, maxEmbedLength-10)
 
-	firstChunk := chunks[0]
-	edit := &discordgo.WebhookEdit{
-		Embeds: &[]*discordgo.MessageEmbed{
-			{Description: firstChunk},
-		},
-	}
-	msg, err := s.InteractionResponseEdit(i.Interaction, edit)
-	if err != nil {
-		slog.Error("failed to edit interaction response",
-			"user_id", userID,
-			"error", err,
-		)
-		return
-	}
-
-	if len(chunks) == 1 {
-		return
-	}
-
-	thread, err := s.MessageThreadStart(i.ChannelID, msg.ID, "Full Response", 60)
-	if err != nil {
-		slog.Error("failed to create thread",
-			"user_id", userID,
-			"message_id", msg.ID,
-			"error", err,
-		)
-		return
-	}
-
-	for idx, chunk := range chunks[1:] {
-		_, err := s.ChannelMessageSendEmbed(thread.ID, &discordgo.MessageEmbed{
-			Description: chunk,
-		})
+	for idx, chunk := range chunks {
+		var err error
+		if len(chunk) <= maxMessageLength-10 {
+			_, err = s.ChannelMessageSend(threadID, chunk)
+		} else {
+			_, err = s.ChannelMessageSendEmbed(threadID, &discordgo.MessageEmbed{
+				Description: chunk,
+			})
+		}
 		if err != nil {
 			slog.Error("failed to send thread message",
-				"user_id", userID,
-				"thread_id", thread.ID,
-				"chunk_index", idx+1,
+				"thread_id", threadID,
+				"chunk_index", idx,
 				"error", err,
 			)
 		}
 	}
-
-	slog.Info("response sent via thread",
-		"user_id", userID,
-		"thread_id", thread.ID,
-		"chunk_count", len(chunks),
-	)
 }
 
 func chunkContent(content string, maxLen int) []string {

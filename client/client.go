@@ -36,10 +36,10 @@ func New(endpoint, apiKey string, timeout time.Duration) *Client {
 	}
 }
 
-func (c *Client) Send(ctx context.Context, message, userID string) (string, error) {
+func (c *Client) Send(ctx context.Context, message, user string) (string, error) {
 	reqBody := Request{
 		Message: message,
-		User:    userID,
+		User:    user,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -57,7 +57,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 
 	slog.Debug("sending api request",
 		"endpoint", c.endpoint,
-		"user_id", userID,
+		"user", user,
 		"body_size", len(body),
 	)
 
@@ -66,7 +66,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	if err != nil {
 		slog.Error("api request failed",
 			"endpoint", c.endpoint,
-			"user_id", userID,
+			"user", user,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"error", err,
 		)
@@ -76,7 +76,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 
 	slog.Debug("api response received",
 		"endpoint", c.endpoint,
-		"user_id", userID,
+		"user", user,
 		"status_code", resp.StatusCode,
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
@@ -85,7 +85,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	if err != nil {
 		slog.Error("failed to read response body",
 			"endpoint", c.endpoint,
-			"user_id", userID,
+			"user", user,
 			"error", err,
 		)
 		return "", fmt.Errorf("failed to read response body: %w", err)
@@ -94,7 +94,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	if resp.StatusCode != http.StatusOK {
 		slog.Error("api returned non-ok status",
 			"endpoint", c.endpoint,
-			"user_id", userID,
+			"user", user,
 			"status_code", resp.StatusCode,
 			"response_body", string(bodyBytes),
 		)
@@ -105,7 +105,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		slog.Error("failed to decode response",
 			"endpoint", c.endpoint,
-			"user_id", userID,
+			"user", user,
 			"response_body", string(bodyBytes),
 			"error", err,
 		)
@@ -115,7 +115,7 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 	if result.Response == "" {
 		slog.Warn("api returned empty response",
 			"endpoint", c.endpoint,
-			"user_id", userID,
+			"user", user,
 			"response_body", string(bodyBytes),
 		)
 	}

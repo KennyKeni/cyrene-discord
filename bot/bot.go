@@ -64,6 +64,11 @@ func (b *Bot) Start() error {
 		go b.elysiaHandler.Handle(s, i)
 	})
 
+	b.session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		go b.chatHandler.HandleMessage(s, m)
+		go b.elysiaHandler.HandleMessage(s, m)
+	})
+
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		slog.Info("bot ready",
 			"username", r.User.Username,
