@@ -49,6 +49,8 @@ func New(token, guildID string, chatClient, elysiaClient *client.Client, unregis
 		return nil, err
 	}
 
+	session.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
+
 	return &Bot{
 		session:                      session,
 		guildID:                      guildID,
