@@ -85,24 +85,37 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 	h.editResponse(s, i, userID, response)
 }
 
-const maxMessageLength = 2000
+const (
+	maxMessageLength = 2000
+	maxEmbedLength   = 4096
+)
 
 func (h *ChatHandler) editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
-	truncated := false
-	if len(content) > maxMessageLength-10 {
-		content = content[:maxMessageLength-13] + "..."
-		truncated = true
+	var edit *discordgo.WebhookEdit
+
+	if len(content) <= maxMessageLength-10 {
+		edit = &discordgo.WebhookEdit{Content: &content}
+	} else {
+		truncated := false
+		if len(content) > maxEmbedLength-10 {
+			content = content[:maxEmbedLength-13] + "..."
+			truncated = true
+		}
+		if truncated {
+			slog.Debug("response truncated",
+				"user_id", userID,
+				"original_length", len(content)+3,
+				"max_length", maxEmbedLength,
+			)
+		}
+		edit = &discordgo.WebhookEdit{
+			Embeds: &[]*discordgo.MessageEmbed{
+				{Description: content},
+			},
+		}
 	}
-	if truncated {
-		slog.Debug("response truncated",
-			"user_id", userID,
-			"original_length", len(content)+3,
-			"max_length", maxMessageLength,
-		)
-	}
-	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &content,
-	})
+
+	_, err := s.InteractionResponseEdit(i.Interaction, edit)
 	if err != nil {
 		slog.Error("failed to edit interaction response",
 			"user_id", userID,
