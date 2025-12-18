@@ -89,8 +89,8 @@ const maxMessageLength = 2000
 
 func (h *ChatHandler) editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, userID, content string) {
 	truncated := false
-	if len(content) > maxMessageLength {
-		content = content[:maxMessageLength-3] + "..."
+	if len(content) > maxMessageLength-10 {
+		content = content[:maxMessageLength-13] + "..."
 		truncated = true
 	}
 	if truncated {
