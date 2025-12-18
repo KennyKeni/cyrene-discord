@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -80,18 +81,43 @@ func (c *Client) Send(ctx context.Context, message, userID string) (string, erro
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("failed to read response body",
+			"endpoint", c.endpoint,
+			"user_id", userID,
+			"error", err,
+		)
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		slog.Error("api returned non-ok status",
 			"endpoint", c.endpoint,
 			"user_id", userID,
 			"status_code", resp.StatusCode,
+			"response_body", string(bodyBytes),
 		)
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var result Response
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		slog.Error("failed to decode response",
+			"endpoint", c.endpoint,
+			"user_id", userID,
+			"response_body", string(bodyBytes),
+			"error", err,
+		)
 		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Response == "" {
+		slog.Warn("api returned empty response",
+			"endpoint", c.endpoint,
+			"user_id", userID,
+			"response_body", string(bodyBytes),
+		)
 	}
 
 	return result.Response, nil
