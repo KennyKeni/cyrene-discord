@@ -44,6 +44,8 @@ func (h *ChatHandler) HandleMessage(s *discordgo.Session, m *discordgo.MessageCr
 		"message_length", len(m.Content),
 	)
 
+	s.ChannelTyping(m.ChannelID)
+
 	start := time.Now()
 	response, err := h.client.Send(context.Background(), m.Content, m.ChannelID)
 	duration := time.Since(start)
@@ -154,6 +156,8 @@ func (h *ChatHandler) Handle(s *discordgo.Session, i *discordgo.InteractionCreat
 			"thread_id", threadID,
 		)
 	}
+
+	s.ChannelTyping(threadID)
 
 	start := time.Now()
 	response, err := h.client.Send(context.Background(), message, threadID)
