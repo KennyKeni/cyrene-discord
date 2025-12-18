@@ -38,6 +38,7 @@ func main() {
 
 	slog.Info("config loaded",
 		"api_endpoint", cfg.APIEndpoint,
+		"stream_api_endpoint", cfg.StreamAPIEndpoint,
 		"elysia_api_endpoint", cfg.ElysiaAPIEndpoint,
 		"api_timeout", cfg.APITimeout,
 		"guild_id", cfg.GuildID,
@@ -45,8 +46,9 @@ func main() {
 
 	chatClient := client.New(cfg.APIEndpoint, cfg.APIKey, cfg.APITimeout)
 	elysiaClient := client.New(cfg.ElysiaAPIEndpoint, cfg.ElysiaAPIKey, cfg.APITimeout)
+	streamClient := client.NewStreamClient(cfg.StreamAPIEndpoint, cfg.APIKey, cfg.APITimeout)
 
-	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, chatClient, elysiaClient, cfg.UnregisterCommandsOnShutdown)
+	b, err := bot.New(cfg.DiscordToken, cfg.GuildID, chatClient, elysiaClient, streamClient, cfg.UnregisterCommandsOnShutdown)
 	if err != nil {
 		slog.Error("failed to create bot", "error", err)
 		os.Exit(1)

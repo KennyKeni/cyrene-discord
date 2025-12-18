@@ -13,6 +13,7 @@ type Config struct {
 	APIEndpoint                  string
 	APIKey                       string
 	APITimeout                   time.Duration
+	StreamAPIEndpoint            string
 	ElysiaAPIEndpoint            string
 	ElysiaAPIKey                 string
 	UnregisterCommandsOnShutdown bool
@@ -31,6 +32,7 @@ func Load() (*Config, error) {
 	viper.BindEnv("API_ENDPOINT")
 	viper.BindEnv("API_KEY")
 	viper.BindEnv("API_TIMEOUT")
+	viper.BindEnv("STREAM_API_ENDPOINT")
 	viper.BindEnv("ELYSIA_API_ENDPOINT")
 	viper.BindEnv("ELYSIA_API_KEY")
 	viper.BindEnv("UNREGISTER_COMMANDS_ON_SHUTDOWN")
@@ -41,6 +43,7 @@ func Load() (*Config, error) {
 		APIEndpoint:                  viper.GetString("API_ENDPOINT"),
 		APIKey:                       viper.GetString("API_KEY"),
 		APITimeout:                   time.Duration(viper.GetInt("API_TIMEOUT")) * time.Second,
+		StreamAPIEndpoint:            viper.GetString("STREAM_API_ENDPOINT"),
 		ElysiaAPIEndpoint:            viper.GetString("ELYSIA_API_ENDPOINT"),
 		ElysiaAPIKey:                 viper.GetString("ELYSIA_API_KEY"),
 		UnregisterCommandsOnShutdown: viper.GetBool("UNREGISTER_COMMANDS_ON_SHUTDOWN"),

@@ -13,6 +13,7 @@ type Bot struct {
 	guildID                      string
 	chatHandler                  *handler.ChatHandler
 	elysiaHandler                *handler.ChatHandler
+	streamChatHandler            *handler.StreamChatHandler
 	commandIDs                   []string
 	unregisterCommandsOnShutdown bool
 }
@@ -43,7 +44,20 @@ var elysiaCommand = &discordgo.ApplicationCommand{
 	},
 }
 
-func New(token, guildID string, chatClient, elysiaClient *client.Client, unregisterCommandsOnShutdown bool) (*Bot, error) {
+var streamChatCommand = &discordgo.ApplicationCommand{
+	Name:        "streamchat",
+	Description: "Send a message with streaming response",
+	Options: []*discordgo.ApplicationCommandOption{
+		{
+			Type:        discordgo.ApplicationCommandOptionString,
+			Name:        "message",
+			Description: "Your message to send",
+			Required:    true,
+		},
+	},
+}
+
+func New(token, guildID string, chatClient, elysiaClient *client.Client, streamClient *client.StreamClient, unregisterCommandsOnShutdown bool) (*Bot, error) {
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -56,6 +70,7 @@ func New(token, guildID string, chatClient, elysiaClient *client.Client, unregis
 		guildID:                      guildID,
 		chatHandler:                  handler.NewChatHandler(chatClient, "chat"),
 		elysiaHandler:                handler.NewChatHandler(elysiaClient, "elysia"),
+		streamChatHandler:            handler.NewStreamChatHandler(streamClient, "streamchat"),
 		unregisterCommandsOnShutdown: unregisterCommandsOnShutdown,
 	}, nil
 }
@@ -64,6 +79,7 @@ func (b *Bot) Start() error {
 	b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		go b.chatHandler.Handle(s, i)
 		go b.elysiaHandler.Handle(s, i)
+		go b.streamChatHandler.Handle(s, i)
 	})
 
 	b.session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -83,7 +99,7 @@ func (b *Bot) Start() error {
 		return err
 	}
 
-	for _, command := range []*discordgo.ApplicationCommand{chatCommand, elysiaCommand} {
+	for _, command := range []*discordgo.ApplicationCommand{chatCommand, elysiaCommand, streamChatCommand} {
 		cmd, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, b.guildID, command)
 		if err != nil {
 			return err
