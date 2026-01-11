@@ -13,6 +13,7 @@ type Bot struct {
 	guildID                      string
 	chatHandler                  *handler.ChatHandler
 	elysiaHandler                *handler.ChatHandler
+	mentionHandler               *handler.MentionHandler
 	commandIDs                   []string
 	unregisterCommandsOnShutdown bool
 }
@@ -49,11 +50,14 @@ func New(token, guildID string, chatClient, elysiaClient *client.Client, unregis
 		return nil, err
 	}
 
+	session.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent | discordgo.IntentsGuilds
+
 	return &Bot{
 		session:                      session,
 		guildID:                      guildID,
 		chatHandler:                  handler.NewChatHandler(chatClient, "chat"),
 		elysiaHandler:                handler.NewChatHandler(elysiaClient, "elysia"),
+		mentionHandler:               handler.NewMentionHandler(chatClient),
 		unregisterCommandsOnShutdown: unregisterCommandsOnShutdown,
 	}, nil
 }
@@ -62,6 +66,10 @@ func (b *Bot) Start() error {
 	b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		go b.chatHandler.Handle(s, i)
 		go b.elysiaHandler.Handle(s, i)
+	})
+
+	b.session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		go b.mentionHandler.Handle(s, m)
 	})
 
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
